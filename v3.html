@@ -34,6 +34,12 @@ button:focus-visible{outline:3px solid var(--sun);outline-offset:2px}
 @media (prefers-color-scheme:dark){.row .yes,.row .no{color:#0b1626}}
 .uwr{display:flex;justify-content:space-between;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--line);font-size:.92rem}.uwr button{border:0;background:none;color:var(--bad);font-size:1.1rem;cursor:pointer;padding:4px 10px}
 .chk{display:flex;align-items:center;gap:6px;font-size:.9rem;color:var(--mute);white-space:nowrap}
+.bub{max-width:90%;margin:8px 0;padding:9px 12px;border-radius:14px;border:1px solid var(--line);background:var(--card)}
+.bub small{display:block;color:var(--mute);font-size:.75rem;margin-bottom:2px}
+.bub em{display:block;color:var(--mute);font-style:normal;font-size:.9rem;margin-top:2px}
+.bub.me{margin-left:auto;background:color-mix(in srgb,var(--acc) 14%,var(--card))}
+.bub.on{outline:2px solid var(--sun)}.bub.ok{border-color:var(--ok)}.bub.bad{border-color:var(--bad)}
+.dgm[aria-pressed=true]{border-color:var(--acc)!important;color:var(--acc)!important;font-weight:600}
 .card .w{font-size:2.2rem;font-weight:800;letter-spacing:-.01em}
 .card .t{color:var(--mute);font-size:.9rem;margin-top:8px}
 .row{display:flex;gap:10px;margin-top:14px}
@@ -153,7 +159,7 @@ let UW=[];try{UW=(JSON.parse(localStorage.getItem('esUser3'))||[]).filter(x=>Arr
 UW.forEach(x=>V.push([x[0],x[1],x[2]]));
 const saveUW=()=>{try{localStorage.setItem('esUser3',JSON.stringify(UW))}catch(e){}};
 const cats=()=>[...new Set(['Wszystkie',...Object.keys(R),'Moje notatki',...V.map(x=>x[2])])];
-const PL={on:false,paused:false,i:0,items:[],token:0};
+const PL={on:false,paused:false,i:0,items:[],token:0,dg:0};
 let cat='Wszystkie';
 const pool=()=>{if(cat==='Wszystkie'){const s=new Set();return V.filter(x=>!s.has(x[0])&&s.add(x[0]))}return V.filter(x=>x[2]===cat)};
 const DAY=864e5,IV=[0,1,2,4,8,16,32,64,128];
@@ -257,7 +263,7 @@ $('#erC').onclick=()=>{if(confirm('Wyczyścić całą listę błędów?')){ER.w=
 $('#erR').onclick=()=>{if(confirm('Zerować postępy w powtórkach fiszek? Listy błędów to nie zmieni.')){SR={};saveSR();rebuild();erTab()}}}
 /* Odtwarzanie ciągłe */
 const vFor=l=>{const vs=window.speechSynthesis?speechSynthesis.getVoices():[];return vs.find(v=>v.lang&&v.lang.replace('_','-')===l)||vs.find(v=>v.lang&&v.lang.toLowerCase().startsWith(l.slice(0,2)))};
-const say=(t,l,r)=>new Promise(res=>{if(!window.speechSynthesis)return res();const u=new SpeechSynthesisUtterance(t);u.lang=l;u.rate=r;const v=vFor(l);if(v)u.voice=v;u.onend=u.onerror=()=>res();setTimeout(res,4000+t.length*160/r);speechSynthesis.speak(u)});
+const say=(t,l,r,pt)=>new Promise(res=>{if(!window.speechSynthesis)return res();const u=new SpeechSynthesisUtterance(t);u.lang=l;u.rate=r;if(pt)u.pitch=pt;const v=vFor(l);if(v)u.voice=v;u.onend=u.onerror=()=>res();setTimeout(res,4000+t.length*160/r);speechSynthesis.speak(u)});
 const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const hold=async(my,ms)=>{let t=0;while(my===PL.token&&t<ms){await wait(100);if(!PL.paused)t+=100}};
 const plWait=async my=>{while(PL.paused&&my===PL.token)await wait(150)};
@@ -276,7 +282,7 @@ function plStart(){if(!window.speechSynthesis){$('#plMsg').textContent='Ta przeg
 const p=pool();if(!p.length){$('#plMsg').textContent='Ta kategoria jest pusta.';return}
 PL.items=$('#plRnd').checked?sh(p):p.slice();PL.i=0;
 $('#plMsg').textContent=vFor('pl-PL')?'':'Nie znaleziono polskiego głosu na tym urządzeniu, więc polskie słowa mogą brzmieć z obcym akcentem.';plRun()}
-function plStop(){PL.token++;PL.on=false;PL.paused=false;if(window.speechSynthesis)speechSynthesis.cancel();setBtn()}
+function plStop(){PL.token++;PL.dg++;PL.on=false;PL.paused=false;if(window.speechSynthesis)speechSynthesis.cancel();setBtn()}
 function plSkip(d){if(!PL.on||!PL.items.length)return;if(window.speechSynthesis)speechSynthesis.cancel();PL.i=(PL.i+d+PL.items.length)%PL.items.length;plRun()}
 $('#plGo').onclick=()=>{if(!PL.on)plStart();else{PL.paused=!PL.paused;setBtn()}};
 $('#plStop').onclick=()=>{plStop();$('#plNow').innerHTML='<div class="t">Naciśnij Start</div>';$('#plMsg').textContent=''};
@@ -324,9 +330,125 @@ const LM={0:['wym','h','pul'],1:['rod','ser','nie'],2:['ser','l9','l8','str'],3:
 const mk=k=>{const f=F[k];return `<a class='lk' href='${f[3]?'https://docs.google.com/document/d/'+f[2]+'/edit':'https://drive.google.com/file/d/'+f[2]+'/view'}' target='_blank' rel='noopener noreferrer'>${f[0]} ${f[1]}</a>`};
 const mat=o=>LM[o]?`<div class='ref'><b>Materiały z Dysku Google</b>${LM[o].map(mk).join('')}<div style='margin-top:6px'>Linki otworzą się tylko osobom, które mają dostęp do tych plików.</div></div>`:'';
 const matAll=()=>`<details class='ref'><summary><b>Wszystkie materiały z Dysku (${Object.keys(F).length})</b></summary>${Object.keys(F).map(mk).join('')}</details>`;
+/* Mini-dialogi */
+const DG=[
+{t:'Zaproszenie na zebranie',s:'Ktoś pyta o zebrania w Twoim zborze',n:['Pani','Ty'],l:[
+'0|¿A qué hora tienen reuniones en Leszno?|O której macie zebrania w Lesznie?',
+'1|Las reuniones en Leszno son a las diez y media de la mañana.|Zebrania w Lesznie są o 10:30 rano.',
+'0|¿Qué día?|W jaki dzień?',
+'1|El domingo.|W niedzielę.',
+'0|¿Solo el domingo?|Tylko w niedzielę?',
+'1|No, también tenemos reuniones los jueves, a las seis y cuarto de la tarde, pero se hacen en polaco.|Nie, mamy też zebrania w czwartki o 18:15, ale odbywają się po polsku.',
+'0|¿Puedo venir?|Mogę przyjść?',
+'1|¡Claro! ¿Qué día le gustaría venir?|Oczywiście! W jaki dzień chciałaby pani przyjść?',
+'0|Voy a venir el domingo a las diez y media.|Przyjdę w niedzielę o 10:30.',
+'1|¡Genial! Entonces voy a esperarla.|Świetnie! W takim razie będę na panią czekać.']},
+{t:'Plan na ten tydzień',s:'Rozmowa z siostrą o planach',n:['Hermana','Ty'],l:[
+'0|¿Qué haces el martes?|Co robisz we wtorek?',
+'1|Tengo el estudio personal a las siete y media de la mañana.|Mam studium osobiste o 7:30 rano.',
+'0|¿Y en la noche?|A wieczorem?',
+'1|En la noche tengo la reunión a las siete y media.|Wieczorem mam zebranie o 19:30.',
+'0|¡Qué valiente! ¡Muy buen uso del tiempo!|Ale odważna! Świetne wykorzystanie czasu!',
+'1|Gracias. ¿Y tú? ¿Qué haces el sábado?|Dziękuję. A ty? Co robisz w sobotę?',
+'0|Tengo una salida para predicar a las cuatro de la tarde.|Mam zbiórkę do służby o 16:00.',
+'1|¡Qué bien!|Super!']},
+{t:'Zbiórka do służby',s:'Pytasz, kiedy i gdzie jest zbiórka',n:['Hermano','Ty'],l:[
+'1|¿A qué hora es la salida para predicar el sábado?|O której jest zbiórka do służby w sobotę?',
+'0|Es a las cuatro de la tarde.|Jest o 16:00.',
+'1|¿Dónde es?|Gdzie jest?',
+'0|En el Salón del Reino.|W Sali Królestwa.',
+'1|¿Vamos a predicar de casa en casa?|Idziemy głosić od domu do domu?',
+'0|Sí, y después tengo una revisita con el señor Juan.|Tak, a potem mam odwiedziny ponowne u pana Juana.',
+'1|¡Qué bien! Entonces nos vemos el sábado.|Świetnie! W takim razie widzimy się w sobotę.',
+'0|¡Por supuesto!|Oczywiście!']},
+{t:'Wracam w czwartek',s:'Odwiedziny ponowne u pana Juana',n:['Señor Juan','Ty'],l:[
+'1|Buenos días, señor Juan. ¿Cómo está?|Dzień dobry, panie Juan. Jak się pan ma?',
+'0|Bien, gracias. ¿Y usted?|Dobrze, dziękuję. A pani?',
+'1|Muy bien, gracias. Gracias por su tiempo.|Bardzo dobrze, dziękuję. Dziękuję za pański czas.',
+'0|Con mucho gusto. ¿Cuándo vuelve?|Z przyjemnością. Kiedy pani wróci?',
+'1|Vuelvo el jueves a las cuatro de la tarde. ¿Qué le parece?|Wrócę w czwartek o 16:00. Co pan na to?',
+'0|Me parece bien. ¡Hasta el jueves!|Pasuje mi. Do czwartku!',
+'1|¡Hasta el jueves!|Do czwartku!']},
+{t:'Umawiamy studium',s:'Rozmawiasz z Carlosem o studium',n:['Carlos','Ty'],l:[
+'1|Hola, Carlos. ¿Cómo estás?|Cześć, Carlos. Jak się masz?',
+'0|Bien, gracias. ¿Y tú?|Dobrze, dziękuję. A ty?',
+'1|Muy bien. ¿Tienes tiempo el miércoles?|Bardzo dobrze. Masz czas w środę?',
+'0|Sí, claro. ¿A qué hora?|Tak, oczywiście. O której?',
+'1|A las cinco de la tarde. ¿Te parece bien?|O 17:00. Pasuje ci?',
+'0|Me parece perfecto. ¿Dónde?|Pasuje idealnie. Gdzie?',
+'1|En mi casa.|U mnie w domu.',
+'0|¡Genial! Entonces nos vemos el miércoles.|Świetnie! W takim razie widzimy się w środę.']},
+{t:'Wieczór wielbienia Boga',s:'Rozmowa o wieczorze rodzinnym',n:['Amiga','Ty'],l:[
+'0|¿Qué haces el jueves en la noche?|Co robisz w czwartek wieczorem?',
+'1|Tengo la noche de adoración en familia a las siete.|Mam wieczór wielbienia Boga w rodzinie o 19:00.',
+'0|¡Qué bien! ¿Qué hacen?|Super! Co robicie?',
+'1|Tenemos un estudio y hablamos de la Biblia.|Mamy studium i rozmawiamy o Biblii.',
+'0|¡Qué suerte!|Co za szczęście!',
+'1|¿Quieres venir?|Chcesz przyjść?',
+'0|¡Claro! ¿A qué hora?|Pewnie! O której?',
+'1|A las siete de la noche.|O 19:00.']},
+{t:'Gdzie jest Sala Królestwa?',s:'Ktoś pyta Cię o drogę',n:['Señora','Ty'],l:[
+'0|Perdón, ¿dónde está el Salón del Reino?|Przepraszam, gdzie jest Sala Królestwa?',
+'1|Queda sobre la calle de Segovia, cerca de la biblioteca.|Znajduje się przy ulicy Segovia, blisko biblioteki.',
+'0|¿Cómo llego desde la parada de autobús?|Jak dojdę od przystanku autobusowego?',
+'1|Camina una cuadra, gira a la izquierda y camina media cuadra más.|Idź jedną przecznicę, skręć w lewo i idź jeszcze pół przecznicy.',
+'0|¿Está frente a la gasolinera?|Czy to naprzeciwko stacji benzynowej?',
+'1|No, está detrás de la biblioteca.|Nie, jest za biblioteką.',
+'0|¡Muchas gracias!|Bardzo dziękuję!',
+'1|Con gusto. ¡La estaré esperando el domingo!|Proszę bardzo. Będę czekać na panią w niedzielę!']},
+{t:'Osiedle bez Sali Królestwa',s:'Rozmowa o terenie bez zboru',n:['Hermano','Ty'],l:[
+'1|¿Hay un Salón del Reino en este barrio?|Czy jest Sala Królestwa na tym osiedlu?',
+'0|No, no hay ningún Salón del Reino.|Nie, nie ma żadnej Sali Królestwa.',
+'1|¿Por qué no hay?|Dlaczego nie ma?',
+'0|Porque no hay publicadores.|Bo nie ma głosicieli.',
+'1|¿Hay ancianos?|Czy są starsi?',
+'0|Sí, hay uno.|Tak, jest jeden.',
+'1|Entonces, ¡vamos a predicar!|W takim razie idziemy głosić!']},
+{t:'Kolacja u braci García',s:'Rozmowa o sobotnim wieczorze',n:['Hermana','Ty'],l:[
+'0|¿Qué haces el sábado en la noche?|Co robisz w sobotę wieczorem?',
+'1|Tengo una cena con los hermanos García a las siete y media.|Mam kolację z braćmi García o 19:30.',
+'0|¡Qué bien! ¿Dónde?|Super! Gdzie?',
+'1|En su casa, cerca del parque.|U nich w domu, blisko parku.',
+'0|¡Qué suerte!|Co za szczęście!',
+'1|Sí, son muy amables.|Tak, są bardzo mili.']},
+{t:'Ile lat żył…?',s:'Rozmowa o postaciach biblijnych',n:['Estudiante','Ty'],l:[
+'0|¿Cuántos años vivió Moisés?|Ile lat żył Mojżesz?',
+'1|Moisés vivió ciento veinte años.|Mojżesz żył 120 lat.',
+'0|¿Y Abrahán?|A Abraham?',
+'1|Abrahán vivió ciento setenta y cinco años.|Abraham żył 175 lat.',
+'0|¿Y Jesús?|A Jezus?',
+'1|Jesús vivió treinta y tres años.|Jezus żył 33 lata.',
+'0|¿Y Jehová?|A Jehowa?',
+'1|¡Jehová vive para siempre!|Jehowa żyje na zawsze!']}
+];
+DG.forEach(d=>{d.l=d.l.map(x=>{const p=x.split('|');return{w:+p[0],e:p[1],p:p[2]}})});
+let dgPl=true;
+const bub=(d,l,c)=>`<div class='bub ${l.w?'me':'ot'} ${c||''}'><small>${esc(d.n[l.w])}</small><span class='say'>${esc(l.e)}</span>${dgPl?`<em>${esc(l.p)}</em>`:''}</div>`;
+function nkD(i,mode){const b=$('#nkBox');window.scrollTo(0,0);PL.dg++;if(window.speechSynthesis)speechSynthesis.cancel();
+if(i==null){b.innerHTML=`<div class='meta'><button id='bk'>← Nauka</button><span>${DG.length} dialogów</span></div><p class='sub'>Krótkie rozmowy ze słownictwa z Twoich lekcji. Możesz je czytać i słuchać albo odegrać swoją rolę.</p>`+DG.map((d,k)=>`<button class='opt dg' data-i='${k}'>${d.t}<small style='display:block;font-weight:400;color:var(--mute)'>${d.s}</small></button>`).join('');
+$('#bk').onclick=()=>nk();b.querySelectorAll('.dg').forEach(x=>x.onclick=()=>nkD(+x.dataset.i,'r'));return}
+const d=DG[i];mode=mode||'r';
+b.innerHTML=`<div class='meta'><button id='bk'>← Dialogi</button><span>${i+1} / ${DG.length}</span></div><h2>${d.t}</h2><p style='margin:0 0 10px;color:var(--mute)'>${d.s}</p><div class='row' style='margin:0 0 10px'><button class='btn dgm' data-m='r' aria-pressed='${mode==='r'}'>📖 Czytaj i słuchaj</button><button class='btn dgm' data-m='p' aria-pressed='${mode==='p'}'>🎭 Odegraj rolę</button></div><div id='dgBody'></div>`;
+$('#bk').onclick=()=>nkD();b.querySelectorAll('.dgm').forEach(x=>x.onclick=()=>nkD(i,x.dataset.m));
+if(mode==='r')dgRead(d);else dgRole(d)}
+function dgRead(d){const box=$('#dgBody');
+box.innerHTML=`<div class='row' style='margin:0 0 8px'><button class='btn' id='dgPlay' style='flex:2'>▶ Odtwórz cały dialog</button><label class='chk' style='flex:1;justify-content:center'><input type='checkbox' id='dgTr' ${dgPl?'checked':''}> tłumaczenie</label></div><div id='dgT'>${d.l.map(l=>bub(d,l)).join('')}</div>`;
+const wire=()=>box.querySelectorAll('.say').forEach(x=>{x.onclick=()=>{PL.dg++;speak(x.textContent)}});wire();
+$('#dgTr').onchange=e=>{dgPl=e.target.checked;$('#dgT').innerHTML=d.l.map(l=>bub(d,l)).join('');wire()};
+$('#dgPlay').onclick=async()=>{const my=++PL.dg,bs=()=>box.querySelectorAll('.bub');for(let k=0;k<d.l.length;k++){bs().forEach((e,j)=>e.classList.toggle('on',j===k));await say(d.l[k].e,'es-ES',.85,d.l[k].w?1.12:.92);if(my!==PL.dg)return;await wait(450);if(my!==PL.dg)return}bs().forEach(e=>e.classList.remove('on'))}}
+function dgRole(d){const box=$('#dgBody'),my=++PL.dg,you=d.l.filter(x=>x.w===1).length;let k=0,s=0;
+box.innerHTML=`<div class='meta'><span id='dgSc'>Punkty: 0 / ${you}</span><span>Grasz: ${esc(d.n[1])}</span></div><div id='dgT'></div><div id='dgA'></div>`;
+const T=$('#dgT'),A=$('#dgA'),add=(l,c)=>{T.insertAdjacentHTML('beforeend',bub(d,l,c))};
+async function step(){while(k<d.l.length&&d.l[k].w===0){const l=d.l[k];add(l);await say(l.e,'es-ES',.85,.92);if(my!==PL.dg)return;await wait(300);if(my!==PL.dg)return;k++}
+if(k>=d.l.length){A.innerHTML=`<div class='end'><b>${s} / ${you}</b>Wynik dialogu<div class='row'><button class='btn' id='dgAg'>Jeszcze raz</button><button class='btn' id='dgBk'>Inne dialogi</button></div></div>`;$('#dgAg').onclick=()=>nkD(DG.indexOf(d),'p');$('#dgBk').onclick=()=>nkD();return}
+const l=d.l[k],dis=sh(DG.flatMap(x=>x.l.filter(y=>y.w===1&&y.e!==l.e))).filter((y,j,a)=>a.findIndex(z=>z.e===y.e)===j).slice(0,2),opts=sh([l,...dis]);
+A.innerHTML=`<div class='q' style='font-size:1.1rem;margin-top:12px'>Twoja kwestia: „${esc(l.p)}”</div>`+opts.map((o,j)=>`<button class='opt' data-j='${j}'>${esc(o.e)}</button>`).join('')+`<div class='fb'></div>`;
+A.querySelectorAll('.opt').forEach(bt=>bt.onclick=()=>{const good=opts[+bt.dataset.j]===l;if(good)s++;$('#dgSc').textContent='Punkty: '+s+' / '+you;A.querySelectorAll('.opt').forEach(x=>{x.disabled=true;if(opts[+x.dataset.j]===l)x.classList.add('ok')});if(!good)bt.classList.add('bad');add(l,good?'ok':'bad');say(l.e,'es-ES',.85,1.12);
+A.querySelector('.fb').innerHTML=(good?'Dobrze!':'Poprawna kwestia jest zaznaczona na zielono.')+'<div class="row"><button class="btn" id="dgNx">Dalej</button></div>';A.querySelector('#dgNx').onclick=()=>{k++;step()};A.querySelector('#dgNx').focus()})}
+step()}
 const done=new Set();
 function nk(o){const b=$('#nkBox');window.scrollTo(0,0);
-if(o==null){b.innerHTML=`<p class='sub'>Najpierw przeczytaj lekcję, potem ćwicz w następnych zakładkach. Tapnij podkreślone hiszpańskie przykłady, by je usłyszeć.</p><div class='meta'><span>Przeczytane: ${done.size} / ${L.length}</span></div>`+L.map((l,i)=>`<button class='opt les' data-i='${i}'>Lekcja ${i+1}: ${l.t}${done.has(i)?' ✓':''}</button>`).join('')+matAll();b.querySelectorAll('.les').forEach(x=>x.onclick=()=>nk(+x.dataset.i));return}
+if(o==null){b.innerHTML=`<p class='sub'>Najpierw przeczytaj lekcję, potem ćwicz w następnych zakładkach. Tapnij podkreślone hiszpańskie przykłady, by je usłyszeć.</p><button class='opt' id='dlgBtn'>💬 Mini-dialogi z lekcji (${DG.length})<small style='display:block;font-weight:400;color:var(--mute)'>zebrania, służba, studium, kierunki</small></button><div class='meta'><span>Przeczytane: ${done.size} / ${L.length}</span></div>`+L.map((l,i)=>`<button class='opt les' data-i='${i}'>Lekcja ${i+1}: ${l.t}${done.has(i)?' ✓':''}</button>`).join('')+matAll();b.querySelectorAll('.les').forEach(x=>x.onclick=()=>nk(+x.dataset.i));$('#dlgBtn').onclick=()=>nkD();return}
 const l=L[o];b.innerHTML=`<div class='meta'><button id='bk'>← Lekcje</button><span>Lekcja ${o+1} / ${L.length}</span></div><h2>${l.t}</h2><div class='les-body'>${l.h}</div>${mat(o)}<div class='row'><button class='btn' id='mk'>${done.has(o)?'Przeczytana ✓':'Oznacz jako przeczytaną'}</button><button class='btn' id='nl'>${o<L.length-1?'Następna lekcja':'Do listy'}</button></div>`;
 b.querySelectorAll('.say').forEach(s=>{s.tabIndex=0;s.setAttribute('role','button');s.onclick=()=>speak(s.textContent);s.onkeydown=e=>{if(e.key==='Enter')speak(s.textContent)}});
 $('#bk').onclick=()=>nk();$('#mk').onclick=()=>{done.add(o);nk(o)};$('#nl').onclick=()=>{done.add(o);nk(o<L.length-1?o+1:undefined)}}
